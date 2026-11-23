@@ -49,6 +49,11 @@ def ch4_analysis(asum, fig_paths, bridge: "ReportDataBridge", span_m: float):
         for lc in all_lcs
     ) if all_lcs else r"--- & --- & --- & --- & --- & --- & --- & --- & --- \\[6pt]"
 
+    rxn_rows = []
+    for lc, rdata in rxn_summary.items():
+        rxn_rows.append(f"{_tex(lc)} & {_fmt(rdata.get('left_kN'))} & {_fmt(rdata.get('right_kN'))} \\\\[6pt]")
+    rxn_body = ("\n\\hline\n").join(rxn_rows) if rxn_rows else r"--- & --- & --- \\[6pt]"
+
     _span_m         = float(bridge.input_dict.get(KEY_SPAN, 0) or 0)
     _allow_live_mm  = _span_m * 1000.0 / 800.0
     _allow_total_mm = _span_m * 1000.0 / 600.0
@@ -142,24 +147,42 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
 
 \vspace{1em}
 \begin{longtable}{|>{\centering\arraybackslash}p{5.2cm}|>{\centering\arraybackslash}p{5.2cm}|>{\centering\arraybackslash}p{5.2cm}|}
-\caption{\textbf{Reactions at Supports}}
+\caption{\textbf{Reactions at Supports}} \\
 \hline
 \textbf{Load Case} & \textbf{Left Support (kN)} & \textbf{Right Support (kN)} \\[6pt]
 \hline
- & """ + '' + r""" & """ + '' + r""" \\[6pt]
+\endfirsthead
+\multicolumn{3}{c}{{\bfseries Reactions at Supports (continued)}} \\
 \hline
- & """ + '' + r""" & """ + '' + r""" \\[6pt]
+\textbf{Load Case} & \textbf{Left Support (kN)} & \textbf{Right Support (kN)} \\[6pt]
 \hline
- & """ + '' + r""" & """ + '' + r""" \\[6pt]
+\endhead
+\hline
+\multicolumn{3}{r}{\textit{Continued on next page...}} \\
+\endfoot
+\hline
+\endlastfoot
+""" + rxn_body + r""" \\
 \hline
 \end{longtable}
 
 \vspace{1em}
 \begin{longtable}{|L{7cm}|p{8.5cm}|}
-\caption{\textbf{Deflection Summary (Live Load \& Total Load)}}
+\caption{\textbf{Deflection Summary (Live Load \& Total Load)}} \\
 \hline
 \textbf{parameter} & \textbf{value} \\
 \hline
+\endfirsthead
+\multicolumn{2}{c}{{\bfseries Deflection Summary (continued)}} \\
+\hline
+\textbf{parameter} & \textbf{value} \\
+\hline
+\endhead
+\hline
+\multicolumn{2}{r}{\textit{Continued on next page...}} \\
+\endfoot
+\hline
+\endlastfoot
 \textnormal{Deflection due to Live Load, $\delta_{LL}$} & """ + _live_str + r""" \\[6pt]
 \hline
 \textnormal{Allowable Live Load Deflection ($\Delta_{allow}$)} & """ + _allow_live_str + r""" \\[6pt]

@@ -83,6 +83,71 @@ def ch2_input_parameters(m, input_dict, output_dict=None):
                       + r""" \\[6pt]
 \hline
 """)
+
+    # Location & environmental data extraction
+    loc_data = input_dict.get("project.location") or input_dict.get("location") or {}
+    if isinstance(loc_data, str):
+        try:
+            import ast
+            loc_data = ast.literal_eval(loc_data)
+        except Exception:
+            try:
+                import json
+                loc_data = json.loads(loc_data)
+            except Exception:
+                loc_data = {}
+    weather = loc_data.get("weather_data", {}) if isinstance(loc_data, dict) else {}
+    lat_val = weather.get("latitude") or input_dict.get("latitude")
+    lon_val = weather.get("longitude") or input_dict.get("longitude")
+    lat_lon_str = f"{lat_val}° N, {lon_val}° E" if lat_val and lon_val else (f"{lat_val}, {lon_val}" if lat_val or lon_val else "Not provided")
+
+    zone_val = weather.get("zone") or input_dict.get("loading.seismic_load.computed.zone_factor")
+    z_num = weather.get("z_value") or input_dict.get("loading.seismic_load.computed.zone_factor")
+    if zone_val and z_num:
+        seismic_zone_str = f"Zone {zone_val} (Z = {z_num})"
+    elif z_num:
+        seismic_zone_str = f"Zone Factor Z = {z_num}"
+    elif zone_val:
+        seismic_zone_str = f"Zone {zone_val}"
+    else:
+        seismic_zone_str = "Not provided"
+
+    wind_speed_val = weather.get("wind_speed") or input_dict.get("loading.wind_load.basic_wind_speed") or input_dict.get("wind_speed")
+    wind_speed_str = f"{wind_speed_val} m/s" if wind_speed_val else "Not provided"
+
+    max_temp_val = weather.get("max_temp") or input_dict.get("shade_temp_max")
+    min_temp_val = weather.get("min_temp") or input_dict.get("shade_temp_min")
+    if max_temp_val is not None and min_temp_val is not None:
+        shade_temp_str = f"{max_temp_val} °C / {min_temp_val} °C"
+    else:
+        shade_temp_str = "Not provided"
+
+    rl_type_str = _render_value(input_dict, KEY_RL_TYPE)
+    if not rl_type_str or rl_type_str.strip() in ("", "None", "---"):
+        rl_type_str = "None (Crash barrier provided)"
+    rl_load_str = _render_value(input_dict, KEY_RL_LOAD_VALUE)
+    if not rl_load_str or rl_load_str.strip() in ("", "None", "---"):
+        rl_load_str = "N/A"
+
+    # Traffic lanes (IRC 5 Cl. 104.3.1)
+    lanes_val = input_dict.get(KEY_WC_LD_LANE_TABLE_COUNT)
+    if not lanes_val or str(lanes_val).strip() in ("", "None", "0"):
+        try:
+            cw = float(input_dict.get(KEY_CARRIAGEWAY_WIDTH, 7.0))
+            lanes_str = "2" if cw >= 5.3 else "1"
+        except Exception:
+            lanes_str = "2"
+    else:
+        lanes_str = str(lanes_val).strip()
+
+    # Footpath width display
+    fp_prov_val = str(input_dict.get(KEY_FOOTPATH, "None")).strip()
+    fp_w_val = input_dict.get(KEY_TS_FOOTPATH_WIDTH)
+    if fp_prov_val.lower() in ("none", "no", "") or (fp_w_val is not None and str(fp_w_val).strip() in ("0", "0.0", "0.00")):
+        fp_width_display = "0.0 m (No footpath provided)"
+    else:
+        fp_width_display = f"{_render_value(input_dict, KEY_TS_FOOTPATH_WIDTH, ' m')} (IRC 5 Cl. 104.3.6 min: 1.5 m)"
+
     return r"""
 \chapter{Input Parameters}
 
@@ -105,13 +170,13 @@ This section documents all inputs provided to OsdagBridge. User-provided inputs 
 \hline
 \textnormal{Project Location} & """ + _tex(m.project_location) + r""" \\
 \hline
-\textnormal{Latitude / Longitude} & """ + (_render_value(input_dict,'latitude')) + ', ' + (_render_value(input_dict,'longitude')) + r""" \\
+\textnormal{Latitude / Longitude} & """ + _tex(lat_lon_str) + r""" \\
 \hline
-\textnormal{Seismic Zone (IRC 6)} & """ + (_render_value(input_dict,'seismic_zone')) + r""" \\
+\textnormal{Seismic Zone (IRC 6)} & """ + _tex(seismic_zone_str) + r""" \\
 \hline
-\textnormal{Basic Wind Speed (IRC 6)} & """ + (_render_value(input_dict,'wind_speed', ' m/s')) + r""" \\
+\textnormal{Basic Wind Speed (IRC 6)} & """ + _tex(wind_speed_str) + r""" \\
 \hline
-\textnormal{Shade Temp. Max / Min (IRC 6)} & """ + (_render_value(input_dict,'shade_temp_max','')) + r""" °C / """ + (_render_value(input_dict,'shade_temp_min','')) + r""" °C \\
+\textnormal{Shade Temp. Max / Min (IRC 6)} & """ + _tex(shade_temp_str) + r""" \\
 \hline
 \end{tabular}
 \vspace{0.4cm}
@@ -168,10 +233,21 @@ Where the user has modified additional inputs, those values are reported here. W
 \vspace{0.8cm}
 
 \begin{longtable}{|L{5.5cm}|p{10.0cm}|}
-\caption{\textbf{Typical Section Details}}
+\caption{\textbf{Typical Section Details}} \\
 \hline
 \textbf{parameter} & \textbf{value} \\
 \hline
+\endfirsthead
+\multicolumn{2}{c}{{\bfseries Typical Section Details (continued)}} \\
+\hline
+\textbf{parameter} & \textbf{value} \\
+\hline
+\endhead
+\hline
+\multicolumn{2}{r}{\textit{Continued on next page...}} \\
+\endfoot
+\hline
+\endlastfoot
 \textnormal{Overall Bridge Width (m)} & """ + (_render_value(input_dict, KEY_TS_OVERALL_WIDTH)) + r""" \\[6pt]
 \hline
 \textnormal{No. of Girders} & """ + (_render_value(input_dict, KEY_TS_NO_OF_GIRDERS)) + r""" \\[6pt]
@@ -182,19 +258,30 @@ Where the user has modified additional inputs, those values are reported here. W
 \hline
 \textnormal{Deck Thickness (mm)} & """ + (_render_value(input_dict, KEY_TS_DECK_THICKNESS, ' mm')) + r""" \\[6pt]
 \hline
-\textnormal{Footpath Width (m)} & """ + (_render_value(input_dict, KEY_TS_FOOTPATH_WIDTH, ' m')) + r""" (IRC 5 Cl. 104.3.6 min: 1.5 m) \\[6pt]
+\textnormal{Footpath Width (m)} & """ + fp_width_display + r""" \\[6pt]
 \hline
-\textnormal{No. of Traffic Lanes} & """ + (_render_value(input_dict, KEY_WC_LD_LANE_TABLE_COUNT)) + r""" (per IRC 5 Cl. 104.3.1) \\[6pt]
+\textnormal{No. of Traffic Lanes} & """ + lanes_str + r""" (per IRC 5 Cl. 104.3.1) \\[6pt]
 \hline
 \end{longtable}
 
 \vspace{0.8em}
 
 \begin{longtable}{|L{5.5cm}|p{10.0cm}|}
-\caption{\textbf{Components Details}}
+\caption{\textbf{Components Details}} \\
 \hline
 \textbf{parameter} & \textbf{value} \\
 \hline
+\endfirsthead
+\multicolumn{2}{c}{{\bfseries Components Details (continued)}} \\
+\hline
+\textbf{parameter} & \textbf{value} \\
+\hline
+\endhead
+\hline
+\multicolumn{2}{r}{\textit{Continued on next page...}} \\
+\endfoot
+\hline
+\endlastfoot
 \textnormal{Crash Barrier Type} & """ + (_render_value(input_dict, KEY_CB_TYPE)) + r""" \\[6pt]
 \hline
 \textnormal{Crash Barrier Load (kN/m)} & """ + (_render_value(input_dict, KEY_CB_LOAD)) + r""" \\[6pt]
@@ -237,20 +324,34 @@ def _girder_tables(input_dict, n_girders):
         )
     ]
 
+    def _dim_val(base_key, i):
+        val = input_dict.get(f"{base_key}.G{i}.M1")
+        if val in ("", None):
+            return ""
+        try:
+            f = float(val)
+            if f < 20.0:  # stored in meters in internal grillage model
+                f *= 1000.0
+            return f"{f:.1f}"
+        except (ValueError, TypeError):
+            return _tex(str(val))
+
     # Helper: one girder-dimension row
     def _dim_row(g_lbl, i):
+        d_val = _dim_val(KEY_MP_GIRDER_DEPTH, i)
+        tw_val = _dim_val(KEY_MP_GIRDER_WEB_THICKNESS, i)
+        tfw_val = _dim_val(KEY_MP_GIRDER_TOP_FLANGE_WIDTH, i)
+        tft_val = _dim_val(KEY_MP_GIRDER_TOP_FLANGE_THICKNESS, i)
+        bfw_val = _dim_val(KEY_MP_GIRDER_BOTTOM_FLANGE_WIDTH, i)
+        bft_val = _dim_val(KEY_MP_GIRDER_BOTTOM_FLANGE_THICKNESS, i)
         return (g_lbl + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_DEPTH}.G{i}.M1", ' mm'))
+                + (f"{d_val} mm" if d_val else "")
                 + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_WEB_THICKNESS}.G{i}.M1", ' mm'))
+                + (f"{tw_val} mm" if tw_val else "")
                 + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_TOP_FLANGE_WIDTH}.G{i}.M1", ' mm'))
-                + ', '
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_TOP_FLANGE_THICKNESS}.G{i}.M1", ' mm'))
+                + (f"{tfw_val} mm, {tft_val} mm" if tfw_val and tft_val else "")
                 + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_BOTTOM_FLANGE_WIDTH}.G{i}.M1", ' mm'))
-                + ', '
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_BOTTOM_FLANGE_THICKNESS}.G{i}.M1", ' mm'))
+                + (f"{bfw_val} mm, {bft_val} mm" if bfw_val and bft_val else "")
                 + r""" \\[8pt]
 \hline
 """)
@@ -305,10 +406,21 @@ def _girder_tables(input_dict, n_girders):
             
 \vspace{4pt}
 \begin{longtable}{|L{2.2cm}|L{1.8cm}|p{3.8cm}|p{3.8cm}|p{3.8cm}|}
-\caption{\textbf{Girder General Information}}
+\caption{\textbf{Girder General Information}} \\
 \hline
 \textbf{Girder} & \textbf{Member ID} & \textbf{Design Mode} & \textbf{Girder Type} & \textbf{Girder Symmetry} \\[6pt]
 \hline
+\endfirsthead
+\multicolumn{5}{c}{{\bfseries Girder General Information (continued)}} \\
+\hline
+\textbf{Girder} & \textbf{Member ID} & \textbf{Design Mode} & \textbf{Girder Type} & \textbf{Girder Symmetry} \\[6pt]
+\hline
+\endhead
+\hline
+\multicolumn{5}{r}{\textit{Continued on next page...}} \\
+\endfoot
+\hline
+\endlastfoot
 """
             + gen_rows
             + r"""\end{longtable}
@@ -316,11 +428,22 @@ def _girder_tables(input_dict, n_girders):
 \vspace{0.6em}
 
 \vspace{4pt}
-\begin{longtable}{|L{1.8cm}|L{2.3cm}|L{1.8cm}|p{4.8cm}|p{4.8cm}|}
-\caption{\textbf{Girder Section Dimensions}}
+\begin{longtable}{|L{2.0cm}|L{2.5cm}|L{2.5cm}|p{4.2cm}|p{4.2cm}|}
+\caption{\textbf{Girder Section Dimensions}} \\
 \hline
-\textbf{Girder} & \textbf{Total Depth, D (mm)} & \textbf{Web, $t_w$ (mm)} & \textbf{Top Flange (b\textsubscript{tf}, t\textsubscript{tf}) mm} & \textbf{Bottom Flange (b\textsubscript{bf}, t\textsubscript{bf}) mm} \\[6pt]
+\textbf{Girder} & \textbf{Total Depth, D} & \textbf{Web, $t_w$} & \textbf{Top Flange ($b_{tf}, t_{tf}$)} & \textbf{Bottom Flange ($b_{bf}, t_{bf}$)} \\[6pt]
 \hline
+\endfirsthead
+\multicolumn{5}{c}{{\bfseries Girder Section Dimensions (continued)}} \\
+\hline
+\textbf{Girder} & \textbf{Total Depth, D} & \textbf{Web, $t_w$} & \textbf{Top Flange ($b_{tf}, t_{tf}$)} & \textbf{Bottom Flange ($b_{bf}, t_{bf}$)} \\[6pt]
+\hline
+\endhead
+\hline
+\multicolumn{5}{r}{\textit{Continued on next page...}} \\
+\endfoot
+\hline
+\endlastfoot
 """
             + dim_rows
             + r"""\end{longtable}
@@ -329,13 +452,21 @@ def _girder_tables(input_dict, n_girders):
 
 \vspace{4pt}
 \begin{longtable}{|L{1.4cm}|p{2.2cm}|p{2.2cm}|p{3.0cm}|p{2.4cm}|p{2.2cm}|}
-\caption{\textbf{Girder Restraint and Stiffener Details}}\\
+\caption{\textbf{Girder Restraint and Stiffener Details}} \\
 \hline
 \textbf{Girder} & \textbf{Torsional / Warping Restraint} & \textbf{Web Philosophy} & \textbf{Intermediate Stiffeners} & \textbf{Longitudinal Stiffeners} & \textbf{Bearing Stiffener} \\[6pt]
 \hline
 \endfirsthead
+\multicolumn{6}{c}{{\bfseries Girder Restraint and Stiffener Details (continued)}} \\
+\hline
+\textbf{Girder} & \textbf{Torsional / Warping Restraint} & \textbf{Web Philosophy} & \textbf{Intermediate Stiffeners} & \textbf{Longitudinal Stiffeners} & \textbf{Bearing Stiffener} \\[6pt]
+\hline
 \endhead
-
+\hline
+\multicolumn{6}{r}{\textit{Continued on next page...}} \\
+\endfoot
+\hline
+\endlastfoot
 """
             + rst_rows
             + r"""\end{longtable}
@@ -388,11 +519,22 @@ def _bracing_tables(input_dict, n_girders):
 \setlength\LTleft{0pt}
 \setlength\LTright{\fill}
 
-\begin{longtable}{|L{2.2cm}|L{2.2cm}|L{3.0cm}|L{2.5cm}|C{1.8cm}|C{1.8cm}|}
-\caption{\textbf{Member Properties: Cross Bracing Details}}
+\begin{longtable}{|L{2.5cm}|L{2.5cm}|L{3.5cm}|L{3.5cm}|C{2.5cm}|}
+\caption{\textbf{Member Properties: Cross Bracing Details}} \\
 \hline
 \textbf{Location} & \textbf{Member IDs} & \textbf{Type of Bracing} & \textbf{Bracing Section} & \textbf{Spacing (m)} \\
 \hline
+\endfirsthead
+\multicolumn{5}{c}{{\bfseries Member Properties: Cross Bracing Details (continued)}} \\
+\hline
+\textbf{Location} & \textbf{Member IDs} & \textbf{Type of Bracing} & \textbf{Bracing Section} & \textbf{Spacing (m)} \\
+\hline
+\endhead
+\hline
+\multicolumn{5}{r}{\textit{Continued on next page...}} \\
+\endfoot
+\hline
+\endlastfoot
 """
 + cb_rows
 + r"""\end{longtable}
@@ -403,11 +545,22 @@ def _bracing_tables(input_dict, n_girders):
 \setlength\LTleft{0pt}
 \setlength\LTright{\fill}
 
-\begin{longtable}{|L{2.2cm}|L{2.2cm}|L{3.0cm}|L{2.5cm}|C{1.8cm}|C{1.8cm}|}
-\caption{\textbf{Member Properties: End Diaphragm Details}}
+\begin{longtable}{|L{3.0cm}|L{3.0cm}|L{4.0cm}|L{4.5cm}|}
+\caption{\textbf{Member Properties: End Diaphragm Details}} \\
 \hline
 \textbf{Location} & \textbf{Member IDs} & \textbf{Type of Bracing} & \textbf{Bracing Section} \\
 \hline
+\endfirsthead
+\multicolumn{4}{c}{{\bfseries Member Properties: End Diaphragm Details (continued)}} \\
+\hline
+\textbf{Location} & \textbf{Member IDs} & \textbf{Type of Bracing} & \textbf{Bracing Section} \\
+\hline
+\endhead
+\hline
+\multicolumn{4}{r}{\textit{Continued on next page...}} \\
+\endfoot
+\hline
+\endlastfoot
 """
 + ed_rows
 + r"""\end{longtable}
@@ -424,10 +577,21 @@ def _shear_connector_table(input_dict, output_dict=None):
 
 \vspace{0.4em}
 \begin{longtable}{|L{5.5cm}|p{10.0cm}|}
-\caption{\textbf{Shear Connector Details}}
+\caption{\textbf{Shear Connector Details}} \\
 \hline
 \textbf{parameter} & \textbf{value} \\
 \hline
+\endfirsthead
+\multicolumn{2}{c}{{\bfseries Shear Connector Details (continued)}} \\
+\hline
+\textbf{parameter} & \textbf{value} \\
+\hline
+\endhead
+\hline
+\multicolumn{2}{r}{\textit{Continued on next page...}} \\
+\endfoot
+\hline
+\endlastfoot
 \textnormal{Stud Diameter (mm)} & """ + (_render_value(od, KEY_SD_SHEAR_DIAMETER, ' mm')) + r""" \\[6pt]
 \hline
 \textnormal{Stud Height (mm)} & """ + (_render_value(od, KEY_SD_SHEAR_HEIGHT, ' mm')) + r""" \\[6pt]
@@ -452,10 +616,21 @@ def _safety_factors_table(input_dict):
 
 \vspace{0.4em}
 \begin{longtable}{|L{5.5cm}|p{10.0cm}|}
-\caption{\textbf{Partial Safety Factors}}
+\caption{\textbf{Partial Safety Factors}} \\
 \hline
 \textbf{parameter} & \textbf{value} \\
 \hline
+\endfirsthead
+\multicolumn{2}{c}{{\bfseries Partial Safety Factors (continued)}} \\
+\hline
+\textbf{parameter} & \textbf{value} \\
+\hline
+\endhead
+\hline
+\multicolumn{2}{r}{\textit{Continued on next page...}} \\
+\endfoot
+\hline
+\endlastfoot
 \textnormal{$\gamma_{M0}$ (Yielding / Buckling)} & """ + (_render_value(input_dict, KEY_DO_GAMMA_M0)) + r""" \\[6pt]
 \hline
 \textnormal{$\gamma_{M1}$ (Ultimate Stress)} & """ + (_render_value(input_dict, KEY_DO_GAMMA_M1)) + r""" \\[6pt]

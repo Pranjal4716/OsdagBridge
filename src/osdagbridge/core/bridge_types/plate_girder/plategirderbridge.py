@@ -973,6 +973,12 @@ class PlateGirderBridge:
         report_inputs = self.input_dict.copy()
         output_dict   = dict(self.output_dict)  # MappingProxyType → dict
 
+        print("\n=== REPORT INPUT DIAGNOSTIC ===")
+        for key in ("geometry.span", "geometry.carriageway_width", "material.girder",
+                    "typical_section.no_of_girders", "typical_section.overall_bridge_width"):
+                print(f"{key}: {report_inputs.get(key)!r}")
+        print(f"Total input keys: {len(report_inputs)}")
+        print("=== END DIAGNOSTIC ===\n")
         # ── Chapter 4: analysis summary for Tables ──────────────────
         lc_sum  = getattr(self, '_lc_summary',       None)
         rxn_sum = getattr(self, '_reaction_summary',  None)
@@ -2293,7 +2299,12 @@ class PlateGirderBridge:
 
     def _run_dcr_checks(self, dataset) -> None:
         """Run structural capacity checks and push DCR percentages to the output dock."""
-        results = PlateGirderAnalysisResults(dataset=dataset, bridge=self.grillage_model)
+        print("DEBUG: deck overhang =", self.get_edge_dist())
+        results = PlateGirderAnalysisResults(
+    dataset=dataset,
+    bridge=self.grillage_model,
+    edge_dist=self.get_edge_dist(),
+)
         _, engine, design_results = run_design_check(
             plate_girder_bridge=self,
             analysis_results=results,
@@ -4091,6 +4102,7 @@ class PlateGirderBridge:
         directly from self.output_dict without touching design_results themselves.
 
         Call this immediately after run_design_check() inside _run_dcr_checks().
+        print("DEBUG: deck overhang =", self.get_edge_dist())
         output_dict must still be mutable (i.e. before the MappingProxyType freeze).
         """
         dr  = design_results          # alias: mm/MPa/kN from designer pipeline

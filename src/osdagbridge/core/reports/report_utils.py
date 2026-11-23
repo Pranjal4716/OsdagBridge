@@ -13,7 +13,8 @@ def _tex(value):
         return r''
     # Normalise non-ASCII glyphs from section designations (e.g. "∠ 100 ⅹ 100ⅹ 10")
     # that pdflatex cannot render.
-    for uni, ascii_ in [('∠', 'L'), ('ⅹ', 'x'), ('×', 'x')]:
+    for uni, ascii_ in [('∠', 'L'), ('ⅹ', 'x'), ('×', 'x'),
+                        ('—', '--'), ('–', '-'), ('…', '...')]:
         s = s.replace(uni, ascii_)
     s = s.replace('\\', r'\textbackslash{}')
     for ch, esc in [('&', r'\&'), ('%', r'\%'), ('$', r'\$'), ('#', r'\#'),
@@ -22,6 +23,15 @@ def _tex(value):
                     ('~', r'\textasciitilde{}'), ('^', r'\^{}')]:
         s = s.replace(ch, esc)
     s = s.replace(':', r':\allowbreak{}')
+    for uni, math_cmd in [
+        ('≤', r'$\le$'),
+        ('≥', r'$\ge$'),
+        ('±', r'$\pm$'),
+        ('°', r'$^\circ$'),
+        ('²', r'$^2$'),
+        ('³', r'$^3$'),
+    ]:
+        s = s.replace(uni, math_cmd)
     return s
 
 

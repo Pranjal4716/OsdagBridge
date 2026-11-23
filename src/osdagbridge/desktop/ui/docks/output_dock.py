@@ -587,10 +587,13 @@ class OutputDock(QWidget):
     def _require_design(self) -> bool:
         """Return True if a design result is available; show an error and return False otherwise."""
         input_dock = getattr(self.parent, "input_dock", None)
-        if input_dock is None or not input_dock.is_locked:
+        backend = getattr(self, "backend", None) or getattr(self.parent, "backend", None)
+        has_results = backend is not None and bool(getattr(backend, "output_dict", None)) and len(backend.output_dict) > 0
+        if input_dock is None or not input_dock.is_locked or not has_results:
             CustomMessageBox(
                 title="Run Design",
-                text="Please run the design first.",
+                text="Please run the design first.\n\n"
+                     "Complete design calculations are required to generate the design report.",
                 dialogType=MessageBoxType.Warning,
             ).exec()
             return False
@@ -756,6 +759,17 @@ class OutputDock(QWidget):
                         plots_widget._ds_all, plots_widget._nodes, plots_widget._members,
                         edge_dist=plots_widget._edge_dist, eng_scale=plots_widget._eng_scale,
                     ))
+                else:
+                    bridge_backend = getattr(main_window, 'backend', None)
+                    if bridge_backend is not None and hasattr(bridge_backend, 'get_results_dataset'):
+                        from osdagbridge.core.bridge_types.plate_girder.plot_generator import (
+                            capture_report_figures,
+                        )
+                        figure_data.update(capture_report_figures(
+                            bridge_backend.get_results_dataset(),
+                            *bridge_backend.get_nodes_members(),
+                            edge_dist=bridge_backend.get_edge_dist(),
+                        ))
             except Exception as exc:
                 logger.warning("Could not capture envelope plot: %s", exc)
 

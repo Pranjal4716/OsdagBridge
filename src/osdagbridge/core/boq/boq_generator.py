@@ -42,49 +42,49 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
         "steel_girders_wt_single": "N.A.",
         "steel_girders_wt_total": "N.A.",
         
-        "steel_bracing_vol_formula": r"\placeholder{Area $\times$ Length}",
+        "steel_bracing_vol_formula": r"Area $\times$ Length",
         "steel_bracing_qty": "N.A.",
         "steel_bracing_vol_total": "N.A.",
         "steel_bracing_wt_single": "N.A.",
         "steel_bracing_wt_total": "N.A.",
 
-        "bracing_top_vol_formula": r"\placeholder{Area $\times$ Length}",
+        "bracing_top_vol_formula": r"Area $\times$ Length",
         "bracing_top_qty": "N.A.",
         "bracing_top_vol_total": "N.A.",
         "bracing_top_wt_single": "N.A.",
         "bracing_top_wt_total": "N.A.",
 
-        "bracing_bot_vol_formula": r"\placeholder{Area $\times$ Length}",
+        "bracing_bot_vol_formula": r"Area $\times$ Length",
         "bracing_bot_qty": "N.A.",
         "bracing_bot_vol_total": "N.A.",
         "bracing_bot_wt_single": "N.A.",
         "bracing_bot_wt_total": "N.A.",
 
-        "bracing_diag_vol_formula": r"\placeholder{Area $\times$ Length}",
+        "bracing_diag_vol_formula": r"Area $\times$ Length",
         "bracing_diag_qty": "N.A.",
         "bracing_diag_vol_total": "N.A.",
         "bracing_diag_wt_single": "N.A.",
         "bracing_diag_wt_total": "N.A.",
         
-        "concrete_deck_vol_formula": r"\placeholder{Width $\times$ Thickness $\times$ Length}",
+        "concrete_deck_vol_formula": r"Width $\times$ Thickness $\times$ Length",
         "concrete_deck_qty": "N.A.",
         "concrete_deck_vol_total": "N.A.",
         "concrete_deck_wt_single": "N.A.",
         "concrete_deck_wt_total": "N.A.",
         
-        "rebar_deck_vol_formula": r"\placeholder{Area $\times$ Length}",
+        "rebar_deck_vol_formula": r"Area $\times$ Length",
         "rebar_deck_qty": "N.A.",
         "rebar_deck_vol_total": "N.A.",
         "rebar_deck_wt_single": "N.A.",
         "rebar_deck_wt_total": "N.A.",
         
-        "shear_studs_vol_formula": r"\placeholder{Area $\times$ Height}",
+        "shear_studs_vol_formula": r"Area $\times$ Height",
         "shear_studs_qty": "N.A.",
         "shear_studs_vol_total": "N.A.",
         "shear_studs_wt_single": "N.A.",
         "shear_studs_wt_total": "N.A.",
 
-        "crash_barrier_vol_formula": r"\placeholder{Area $\times$ Length}",
+        "crash_barrier_vol_formula": r"Area $\times$ Length",
         "crash_barrier_qty": "N.A.",
         "crash_barrier_vol_total": "N.A.",
         "crash_barrier_wt_single": "N.A.",
@@ -122,14 +122,42 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
                     quantities["concrete_deck_wt_total"] = f"{(concrete_vol * 2.5):.2f}"
 
                     # 2. Reinforcement Steel (Cu.m) and Weight (MT)
-                    rebar_wt_kg = concrete_vol * 120.0
-                    rebar_vol = rebar_wt_kg / 7850.0
-                    rebar_area = rebar_vol / span if span > 0 else 0.0
+                    # Sourced directly from actual calculated deck slab reinforcement detailing
+                    dd_results = outputs.get("deck_design_results", {}) or {}
+                    as_bot = float(dd_results.get("rebar_bottom_area") or dd_results.get("deck.report.as_bot") or 0.0)
+                    as_top = float(dd_results.get("rebar_top_area") or dd_results.get("deck.report.as_top") or 0.0)
+                    as_oh = float(dd_results.get("rebar_overhang_area") or dd_results.get("deck.report.as_oh") or 0.0)
+                    as_long = float(dd_results.get("rebar_long_area") or dd_results.get("rebar_longitudinal_area") or dd_results.get("deck.report.as_long") or 0.0)
+                    deck_overhang_val = inputs.get("typical_section.deck_overhang") or 0.0
+                    try:
+                        deck_oh = float(deck_overhang_val)
+                    except Exception:
+                        deck_oh = 0.0
+                    int_width = max(0.0, overall_width - 2.0 * deck_oh)
+
+                    if as_bot > 0 or as_top > 0 or as_oh > 0:
+                        # Genuine calculated detailing reinforcement steel:
+                        # Interior transverse rebar: (As_bot + As_top) * interior_width * span
+                        # Overhang transverse rebar: As_oh * (2 * overhang) * span
+                        # Longitudinal distribution rebar: min 0.2% per IRC 112 Cl. 16.5 if 0
+                        if as_long <= 0.0 and deck_thickness > 0:
+                            as_long = 0.002 * (deck_thickness * 1000.0) * 1000.0
+                        vol_trans_int = ((as_bot + as_top) * 1e-6) * int_width * span
+                        vol_trans_oh = (as_oh * 1e-6) * (2.0 * deck_oh) * span
+                        vol_long = (as_long * 1e-6) * overall_width * span
+                        rebar_vol = vol_trans_int + vol_trans_oh + vol_long
+                        rebar_wt_kg = rebar_vol * 7850.0
+                        rebar_wt_mt = rebar_wt_kg / 1000.0
+                        rebar_area = rebar_vol / span if span > 0 else 0.0
+                    else:
+                        rebar_wt_kg = concrete_vol * 120.0
+                        rebar_vol = rebar_wt_kg / 7850.0
+                        rebar_area = rebar_vol / span if span > 0 else 0.0
+                        rebar_wt_mt = rebar_wt_kg / 1000.0
+
                     quantities["rebar_deck_vol_formula"] = f"${rebar_area:.6f}\\text{{ m}}^2 \\times {span:.2f}\\text{{ m}} = {rebar_vol:.5f}\\text{{ m}}^3$"
                     quantities["rebar_deck_qty"] = "1"
                     quantities["rebar_deck_vol_total"] = f"{rebar_vol:.2f}"
-                    
-                    rebar_wt_mt = rebar_wt_kg / 1000.0
                     quantities["rebar_deck_wt_single"] = f"{rebar_wt_mt:.2f}"
                     quantities["rebar_deck_wt_total"] = f"{rebar_wt_mt:.2f}"
             except Exception:

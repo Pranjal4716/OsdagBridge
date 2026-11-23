@@ -742,6 +742,12 @@ class CustomWindow(QWidget):
                     # Lock the input dock after design is triggered
                     if self.input_dock and not self.input_dock.is_locked:
                         self.input_dock.toggle_lock()
+                    print("\n=== INPUT CHECK AFTER DESIGN ===")
+                    print("Backend input count:", len(self.backend.input_dict))
+                    print("Backend input keys:", list(self.backend.input_dict.keys())[:15])
+                    print("UI input count:", len(self.input_dict))
+                    print("Same backend:", self.backend is getattr(self, "backend", None))
+                    print("================================\n")
 
                     # Wire up the plots widget with results from the completed analysis
                     ds_all    = self.backend.get_results_dataset()
@@ -857,6 +863,13 @@ class CustomWindow(QWidget):
                 return
 
             self.input_dock.populate_from_dict(data)
+
+            # Sync backend input_dict so backend is immediately primed with loaded inputs
+            if hasattr(self, "backend") and self.backend is not None:
+                try:
+                    self.backend.set_input(self.input_dict)
+                except Exception:
+                    pass
 
             # Sync additional inputs dialog if it has already been constructed
             if self._additional_inputs_dialog is not None:
@@ -1314,6 +1327,31 @@ class CustomWindow(QWidget):
         import sys, os, traceback
 
         try:
+            if not hasattr(self, 'backend') or self.backend is None:
+                CustomMessageBox(
+                    title="Report Error",
+                    text="No design backend available. Run design first.",
+                    dialogType=MessageBoxType.Critical,
+                ).exec()
+                return
+
+            # Ensure backend inputs are synchronized with UI inputs
+            if not getattr(self.backend, "input_dict", None) and getattr(self, "input_dict", None):
+                try:
+                    self.backend.set_input(self.input_dict)
+                except Exception:
+                    pass
+
+            # Guard: ensure Design has actually been completed before generating report
+            if not getattr(self.backend, "output_dict", None) or len(self.backend.output_dict) == 0:
+                CustomMessageBox(
+                    title="Run Design",
+                    text="Please run the design first.\n\n"
+                         "Complete design calculations are required to generate the design report.",
+                    dialogType=MessageBoxType.Warning,
+                ).exec()
+                return
+
             dialog = ReportOptionsDialog(parent=self)
 
             if hasattr(self, '_report_metadata') \

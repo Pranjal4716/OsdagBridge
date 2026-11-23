@@ -398,7 +398,7 @@ class BridgeConfig:
                 "Run deck layout setup before calling from_plate_girder_bridge()."
             )
         carriageway = deck.carriageway_width
-        n_girders = geom.n_l
+        n_girders = bridge._girder_count()
         edge_dist = geom.edge_dist
 
         # Cross-bracing spacing drives the lateral unbraced length for LTB.

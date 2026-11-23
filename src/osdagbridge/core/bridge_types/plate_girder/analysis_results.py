@@ -141,7 +141,6 @@ from osdagbridge.core.utils.codes.irc6_2017 import IRC6_2017
 
 
 class PlateGirderAnalysisResults:
-
     # ========================================================
     # INITIALIZATION
     # ========================================================
